@@ -35,8 +35,6 @@ import TSL.SymbolTable (stName)
 
 import Data.Maybe (fromJust)
 
-import Data.List (lookup)
-
 import Data.Set as Set
   ( difference
   , filter

@@ -27,7 +27,9 @@ module TSL.Dependency
 
 import TSL.Logic (Formula(..), tslFormula)
 
-import TSL.Specification (Specification(..))
+import TSL.Specification (Specification)
+
+import qualified TSL.Specification as Spec(Specification(..))
 
 import TSL.SymbolTable (stName)
 
@@ -132,11 +134,11 @@ specifications2dependencies
 
 specifications2dependencies specs =
   let
-    assumptionss = map (extract assumptions) specs
-    guaranteess = map (extract guarantees) specs
+    assumptionss = map (extract Spec.assumptions) specs
+    guaranteess = map (extract Spec.guarantees) specs
   in
   formulas2dependencies $ zip assumptionss guaranteess
   where
     extract :: (Specification -> [Formula Int]) -> Specification -> [Formula String]
-    extract getFormulas spec@Specification{symboltable} =
+    extract getFormulas spec@Spec.Specification{symboltable} =
       map (fmap (stName symboltable)) $ getFormulas spec

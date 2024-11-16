@@ -18,7 +18,6 @@ module ArgParseUtils
 
 -----------------------------------------------------------------------------
 
-import Data.Semigroup ((<>))
 import Options.Applicative
 import Options.Applicative.Help.Pretty
 
@@ -45,7 +44,7 @@ maybeFileParserInfo (name, description) =
   info
     (maybeFileParser <**> helper)
     (  fullDesc
-    <> headerDoc (Just $ string header)
+    <> headerDoc (Just $ pretty header)
     )
 
 parseMaybeFilePath :: (String, String) -> IO (Maybe FilePath)
