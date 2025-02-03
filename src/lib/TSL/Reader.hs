@@ -23,12 +23,10 @@ module TSL.Reader
 import TSL.Expression
   ( Expr(..)
   , Expr'(..)
-  , ExprPos(..)
-  , applySub
   , subExpressions
   )
 
-import TSL.Error (Error, errCircularImp, genericError)
+import TSL.Error (Error, genericError)
 
 import TSL.SymbolTable (IdRec(..), Kind(..), SymbolTable, symbolTable)
 
@@ -79,15 +77,9 @@ import qualified Data.IntMap as IM
   , (!)
   )
 
-import Control.Arrow (second)
-
 import Control.Monad ((>=>))
 
 import qualified Data.Array.IArray as A (Array, array, (!))
-
-import System.Directory (canonicalizePath, doesFileExist, doesPathExist)
-
-import System.FilePath.Posix (combine, isAbsolute, takeDirectory)
 
 import Data.Set (Set, empty, insert, member, toList)
 
@@ -95,11 +87,10 @@ import Data.Set (Set, empty, insert, member, toList)
 
 -- | Parses a TSL specification.
 
-fromTSL
-  :: Maybe FilePath -> String -> IO (Either Error Specification)
+fromTSL :: String -> IO (Either Error Specification)
 
-fromTSL specPath =
-  resolveImports specPath [] >=> return . (>>= process)
+fromTSL =
+  return . resolveImports >=> return . (>>= process)
 
 -----------------------------------------------------------------------------
 
@@ -146,82 +137,15 @@ process =
 --------------------------------------------------------------------------------
 
 resolveImports
-  :: Maybe FilePath -> [(FilePath, ExprPos)] -> String -> IO (Either Error PD.Specification)
+  :: String -> Either Error PD.Specification
 
-resolveImports specPath ls str = case parse str of
-  Left err   -> return $ Left err
+resolveImports str = case parse str of
+  Left err   -> Left err
   Right spec -> loadImports spec
-
-  where
+ where
     loadImports spec = case PD.imports spec of
-      [] -> return $ Right spec
-      (path, name, p1, _):xr ->
-        resolvePath path
-        >>= \case
-          Nothing ->
-            return $ genericError $
-            "Import path resolution failed: import path was: \"" ++ path ++ "\" in \"" ++ importer ++ "\""
-          Just path' ->
-            if any ((== path') . fst) ls
-            then
-              let (x, p) : _ = filter ((== path') . fst) ls
-              in return $ errCircularImp [(path', p1), (x, p)] p
-            else do
-              exists <- doesFileExist path'
-              if not exists
-              then
-                return $ genericError $
-                "Imported file does not exist \"" ++ path' ++ "\" (import path was: \"" ++ path ++ "\" in \"" ++ importer ++ "\")"
-              else
-                readFile path'
-                >>= resolveImports (Just path') ((path', p1 { srcPath = Just path' }):ls)
-                >>= \case
-                  Left err    -> return $ Left err
-                  Right spec' ->
-                    loadImports PD.Specification
-                      { imports = xr
-                      , definitions =
-                          map
-                            (updB path' . fmap ((name ++ ".") ++))
-                            (PD.definitions spec')
-                          ++ PD.definitions spec
-                      , sections =
-                          map
-                            (second (upd path' . fmap ((name ++ ".") ++)))
-                            (PD.sections spec')
-                          ++ PD.sections spec
-                      }
-
-    resolvePath path = do
-      let combinedPath = case specPath of
-            Nothing -> path
-            Just specPath ->
-              if isAbsolute path
-              then path
-              else combine (takeDirectory specPath) path
-      exists <- doesPathExist combinedPath
-      if exists
-      then Just <$> canonicalizePath combinedPath
-      else return Nothing
-
-    importer = fromMaybe "STDIN" specPath
-
-    updE path = \case
-      GuardedBinding xs    -> GuardedBinding $ map (upd path) xs
-      PatternBinding x y   -> PatternBinding (upd path x) (upd path y)
-      SetBinding x         -> SetBinding $ upd path x
-      RangeBinding x g y h -> RangeBinding (upd path x) g (upd path y) h
-
-    updB path Binding{..} =
-      Binding
-        { bIdent = bIdent
-        , bArgs = map (second (\x -> x { srcPath = Just path })) bArgs
-        , bPos = bPos { srcPath = Just path }
-        , bVal = updE path bVal
-        }
-
-    upd path e =
-      applySub (upd path) e { srcPos = (srcPos e) { srcPath = Just path } }
+      [] -> Right spec
+      _ -> genericError $ "Imports not supported"
 
 -----------------------------------------------------------------------------
 

@@ -22,7 +22,6 @@ module TSL.Error
   , bindingError
   , conversionError
   , depError
-  , cfgError
   , parseError
   , genericError
   , prError
@@ -31,7 +30,6 @@ module TSL.Error
   , errConflict
   , errPattern
   , errConditional
-  , errCircularImp
   , errCircularDep
   , errExpect
   , errRange
@@ -68,7 +66,6 @@ data Error
   | ErrSyntax SyntaxError
   | ErrRunT RunTimeError
   | ErrConv ConvError
-  | ErrCfg CfgError
   | ErrFormat FormatError
   | ErrGeneric GenericError
 
@@ -142,14 +139,6 @@ data ConvError =
 
 -----------------------------------------------------------------------------
 
-newtype CfgError =
-  ConfigError
-    { fmsg :: String
-    }
-  deriving (Eq, Ord)
-
------------------------------------------------------------------------------
-
 instance Show Error where
   show = \case
     ErrParse x                   -> show x
@@ -158,7 +147,6 @@ instance Show Error where
     ErrDep DependencyError {..}  -> pr "Dependency Error" errDPos errDMsgs
     ErrSyntax SyntaxError {..}   -> pr "Syntax Error" errSPos errSMsgs
     ErrRunT RunTimeError {..}    -> pr "Evaluation Error" errRPos errRMsgs
-    ErrCfg ConfigError {..}      -> "\"Error\":\n" ++ fmsg
     ErrConv ConvError {..}       ->
       "\"Conversion Error\": " ++ title ++ "\n" ++ cmsg
     ErrFormat FormatError {..}   ->
@@ -222,17 +210,6 @@ depError
 
 depError pos =
   Left . ErrDep . DependencyError pos . return
-
------------------------------------------------------------------------------
-
--- | Use this error constructor, if some unresolvable inconsistency in the
--- configuration exists.
-
-cfgError
-  :: String -> Either Error a
-
-cfgError =
-  Left . ErrCfg . ConfigError
 
 -----------------------------------------------------------------------------
 
@@ -384,29 +361,6 @@ errCircularDep xs pos =
         if length xs > 1
           then ""
           else " depends on itself"
-   in
-     depError pos msg
-
------------------------------------------------------------------------------
-
--- | Throws an error that indicates a set of imports that decribe a
--- circular dependency between each other.
-
-errCircularImp
-  :: [(String, ExprPos)] -> ExprPos -> Either Error b
-
-errCircularImp xs pos =
-  let
-    m = foldl max (length $ fst $ head xs) $ map (length . fst) xs
-    msg =
-      "detected circular imports:" ++
-      concatMap
-        (\(x, y) ->
-           "\n  " ++
-           x ++
-           replicate (m - length x) ' ' ++
-           " (imported at " ++ prErrPos y ++ ")")
-        xs
    in
      depError pos msg
 
